@@ -3,337 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>干瞪眼计分器</title>
+    <title>微筹码精简版 - 干瞪眼</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/roomservice-browser@0.1.2/dist/roomservice.js"></script>
     <style>
         body { -webkit-touch-callout: none; -webkit-user-select: none; }
-        .huge-btn { font-size: 1.75rem; padding: 0.85rem; text-align: center; border-radius: 0.75rem; font-weight: bold; transition: all 0.1s; }
-        .huge-btn:active { transform: scale(0.95); filter: brightness(0.9); }
+        .chip-btn { font-size: 1.85rem; padding: 0.95rem 0; text-align: center; border-radius: 0.85rem; font-weight: 900; transition: all 0.1s; }
+        .chip-btn:active { transform: scale(0.95); filter: brightness(0.85); }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col p-4 font-sans selection:bg-transparent">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col p-4 font-sans selection:bg-transparent">
 
-    <header class="bg-slate-800 p-4 rounded-xl shadow-lg mb-4 flex justify-between items-center">
-        <div>
-            <h1 class="text-2xl font-black tracking-wider text-amber-400">🎴 干瞪眼计分器</h1>
-            <div id="room-status" class="text-xs text-slate-400 font-bold mt-1">正在初始化联机模块...</div>
+    <div id="pay-overlay" class="fixed inset-0 bg-slate-950/95 z-50 flex flex-col items-center justify-center p-6 text-center">
+        <div class="bg-slate-900 p-6 rounded-2xl shadow-2xl max-w-sm w-full border-2 border-amber-400 space-y-5">
+            <h2 class="text-2xl font-black text-amber-400">⚡ 纯净无广告激活 ⚡</h2>
+            <p class="text-base font-bold text-slate-300 leading-relaxed">
+                本程序完美复刻微筹码功能，并<span class="text-emerald-400">永久移除弹窗广告</span>。<br>
+                每次开局，请长按下方二维码<br><span class="text-amber-400 text-xl font-black">自觉转账 1 元辛苦费</span>。
+            </p>
+            
+            <div class="bg-white p-3 rounded-xl mx-auto w-44 h-44 flex flex-col items-center justify-center shadow-inner relative overflow-hidden">
+                <div class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-slate-100 text-slate-800 text-sm font-bold">
+                    <span>🖼️ 收款二维码</span>
+                    <span class="text-xs text-slate-500 mt-1">如图片未加载<br>请直接微信转账群主</span>
+                </div>
+                <img src="https://pic1.imgdb.cn/item/6a09955242582d261d233f8a.jpg" alt="微信扫码转账" class="max-w-full max-h-full z-10 relative">
+            </div>
+            
+            <p class="text-xs text-slate-500 font-bold">相互信任，打牌更顺畅！多谢老板厚爱~</p>
+            
+            <button onclick="closePayOverlay()" class="w-full bg-amber-500 text-slate-950 text-xl font-black py-4 rounded-xl shadow-lg active:scale-95 transition">
+                🚀 免广告进入计分器
+            </button>
         </div>
-        <button onclick="emergencyRefresh()" class="bg-slate-700 text-slate-200 px-3 py-2 rounded-lg font-bold text-sm border border-slate-600 active:scale-95">
-            🔄 卡顿刷新
+    </div>
+
+    <header class="bg-slate-900 p-3 flex justify-between items-center border-b border-slate-800">
+        <div>
+            <h1 class="text-xl font-black tracking-wider text-amber-400">⚡ 微筹码纯净版</h1>
+            <div id="room-status" class="text-xs text-emerald-400 font-bold mt-0.5">🟢 联机通道就绪</div>
+        </div>
+        <button onclick="emergencyRefresh()" class="bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg font-bold text-xs border border-slate-700 active:scale-95">
+            🔄 强制刷新
         </button>
     </header>
 
-    <section id="login-view" class="bg-slate-800 p-6 rounded-xl shadow-lg space-y-6 my-auto">
-        <div>
-            <label class="block text-xl font-bold mb-2 text-slate-300">1. 你的名字：</label>
-            <input type="text" id="username-input" class="w-full text-2xl p-3 bg-slate-700 rounded-lg text-white font-bold border-2 border-slate-600 focus:border-amber-400 outline-none" placeholder="输入名字">
+    <section id="login-view" class="bg-slate-900 p-4 rounded-xl space-y-6 my-auto">
+        <div class="space-y-2">
+            <label class="block text-lg font-bold text-slate-400">1. 输入玩家姓名：</label>
+            <input type="text" id="username-input" class="w-full text-2xl p-3 bg-slate-800 rounded-xl text-white font-black border-2 border-slate-700 focus:border-amber-400 outline-none text-center" placeholder="请输入名字">
         </div>
-        <div class="border-t border-slate-700 pt-4">
-            <label class="block text-xl font-bold mb-2 text-slate-300">2. 房间操作：</label>
-            <button onclick="createRoom()" class="w-full bg-emerald-600 text-white text-2xl font-bold py-4 rounded-xl shadow-md hover:bg-emerald-500 active:scale-95 transition mb-3">
-                ➕ 我要开新房间
+        <div class="border-t border-slate-800 pt-4 space-y-3">
+            <label class="block text-lg font-bold text-slate-400">2. 联机大厅：</label>
+            <button onclick="createRoom()" class="w-full bg-emerald-600 text-white text-2xl font-black py-4 rounded-xl shadow-md active:scale-95 transition">
+                创建新房间 (我是房主)
             </button>
             <div class="flex gap-2">
-                <input type="text" id="room-input" class="w-2/3 text-xl p-3 bg-slate-700 rounded-lg text-white font-bold border-2 border-slate-600" placeholder="输入别人的房间号">
-                <button onclick="joinRoom()" class="w-1/3 bg-amber-500 text-slate-900 text-xl font-bold rounded-xl active:scale-95 transition">
-                    加入
+                <input type="text" id="room-input" class="w-2/3 text-xl p-3 bg-slate-800 rounded-xl text-white font-black border-2 border-slate-700 text-center" placeholder="输入4位房间号">
+                <button onclick="joinRoom()" class="w-1/3 bg-amber-500 text-slate-950 text-xl font-black rounded-xl active:scale-95 transition">
+                    加入房间
                 </button>
             </div>
         </div>
     </section>
 
-    <section id="game-view" class="hidden flex-col flex-1 space-y-4">
-        
-        <div class="bg-amber-500 text-slate-950 p-4 rounded-xl shadow-inner text-center">
-            <div class="text-lg font-bold opacity-80">🔥 第 <span id="round-num" class="font-black">1</span> 局 · 本局总奖池</div>
-            <div id="total-pool" class="text-5xl font-black my-1">0</div>
-            <div class="text-xs font-bold bg-amber-600/30 py-1 rounded">所有人输完点数后，赢家点【一键收回】</div>
+    <section id="game-view" class="hidden flex-col flex-1 space-y-4 pt-2">
+        <div class="bg-gradient-to-b from-slate-800 to-slate-900 p-4 rounded-2xl shadow-2xl text-center border border-slate-700">
+            <div class="text-sm font-bold text-slate-400 tracking-widest">ROUND <span id="round-num" class="text-amber-400 font-black">1</span> · 本局总奖池</div>
+            <div id="total-pool" class="text-6xl font-black my-2 tracking-tight text-amber-400">0</div>
+            <div class="text-xs font-medium text-slate-500">输家录入点数 ➡️ 赢家一键收网</div>
         </div>
 
-        <div id="players-container" class="space-y-3 max-h-[30vh] overflow-y-auto pr-1">
-            </div>
+        <div id="players-container" class="space-y-2 max-h-[30vh] overflow-y-auto pr-1"></div>
 
-        <div id="my-panel" class="bg-slate-800 p-4 rounded-xl shadow-lg border-t-4 border-amber-400 mt-auto space-y-3">
-            <div class="flex justify-between items-center">
-                <span class="text-lg font-bold text-slate-300">我这一局输了：<span id="my-current-loss" class="text-2xl text-red-400 font-black">0</span> 点</span>
-                <button onclick="clearMyLoss()" class="text-sm bg-slate-700 text-slate-300 px-3 py-1 rounded-lg font-bold">重置本局</button>
+        <div id="my-panel" class="bg-slate-900 p-4 rounded-2xl border-t border-slate-800 mt-auto space-y-3">
+            <div class="flex justify-between items-center px-1">
+                <span class="text-base font-bold text-slate-400">本局我已输：<span id="my-current-loss" class="text-2xl text-red-500 font-black">0</span> 点</span>
+                <button onclick="clearMyLoss()" class="text-xs bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg font-bold border border-slate-700">撤销重填</button>
             </div>
             
-            <div class="flex items-center gap-2 bg-slate-700 p-2 rounded-lg">
-                <span class="text-sm font-bold text-slate-300 whitespace-nowrap">自定义点数：</span>
-                <input type="number" id="custom-loss-input" class="w-full text-xl p-1 bg-slate-800 rounded text-center font-black text-amber-400 outline-none" placeholder="输入点数">
-                <button onclick="addCustomLoss()" class="bg-amber-500 text-slate-900 px-4 py-1.5 rounded font-black text-sm whitespace-nowrap active:scale-95">确定</button>
+            <div class="flex items-center gap-2 bg-slate-800 p-2 rounded-xl border border-slate-700">
+                <input type="number" id="custom-loss-input" class="w-full text-xl p-1 bg-slate-900 rounded-lg text-center font-black text-amber-400 outline-none" placeholder="其他大点数输入这里">
+                <button onclick="addCustomLoss()" class="bg-amber-500 text-slate-950 px-5 py-2 rounded-xl font-black text-sm active:scale-95 whitespace-nowrap">确定</button>
             </div>
 
-            <div class="grid grid-cols-4 gap-2">
-                <button onclick="addLoss(1)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+1</button>
-                <button onclick="addLoss(2)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+2</button>
-                <button onclick="addLoss(3)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+3</button>
-                <button onclick="addLoss(4)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+4</button>
-                <button onclick="addLoss(5)" class="huge-btn bg-red-950 text-red-200 border-b-4 border-red-950">+5</button>
-                <button onclick="addLoss(6)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+6</button>
-                <button onclick="addLoss(7)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+7</button>
-                <button onclick="addLoss(8)" class="huge-btn bg-red-600 text-white border-b-4 border-red-800">+8</button>
+            <div class="grid grid-cols-4 gap-2.5">
+                <button onclick="addLoss(1)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+1</button>
+                <button onclick="addLoss(2)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+2</button>
+                <button onclick="addLoss(3)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+3</button>
+                <button onclick="addLoss(4)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+4</button>
+                <button onclick="addLoss(5)" class="chip-btn bg-orange-950/40 text-orange-400 border-b-4 border-orange-950">+5</button>
+                <button onclick="addLoss(6)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+6</button>
+                <button onclick="addLoss(7)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+7</button>
+                <button onclick="addLoss(8)" class="chip-btn bg-red-600 text-white border-b-4 border-red-800">+8</button>
             </div>
 
-            <button onclick="confirmWin()" class="w-full bg-emerald-600 text-white text-2xl font-black py-4 rounded-xl shadow-lg border-b-4 border-emerald-800 active:scale-95 transition">
-                👑 我赢了！一键收回全场
+            <button onclick="confirmWin()" class="w-full bg-emerald-600 text-white text-2xl font-black py-4 rounded-xl shadow-xl border-b-4 border-emerald-800 active:scale-95 transition">
+                👑 我赢了！一键收回全池
             </button>
         </div>
     </section>
 
     <script>
-        let peer = null;
-        let conn = null; 
-        let connections = []; 
-        let isHost = false;
-
-        let gameState = {
-            roomId: '',
-            round: 1,
-            players: {} 
-        };
-        let myId = '';
+        let channel = null;
+        let myId = 'p_' + Math.random().toString(36).substr(2, 9);
         let myName = '';
+        let gameState = { roomId: '', round: 1, players: {} };
 
         window.onload = function() {
-            // 自动恢复名字
             const savedName = localStorage.getItem('gandengyan_name');
             if (savedName) document.getElementById('username-input').value = savedName;
             
-            initPeer(() => {
-                // 检查有没有没结束的房间，有就自动重连进入
-                const savedRoomId = localStorage.getItem('gandengyan_room_id');
-                const savedIsHost = localStorage.getItem('gandengyan_is_host');
-                
-                if (savedRoomId && savedName) {
-                    document.getElementById('room-input').value = savedRoomId;
-                    if (savedIsHost === 'true') {
-                        // 如果之前是房东，重新初始化房东房号
-                        recreateHostRoom(savedRoomId);
-                    } else {
-                        // 如果之前是客人，自动加入
-                        joinRoom();
-                    }
-                }
-            });
+            document.getElementById('room-status').innerText = "🟢 联机通道就绪";
+
+            const savedRoomId = localStorage.getItem('gandengyan_room_id');
+            if (savedRoomId && savedName) {
+                document.getElementById('room-input').value = savedRoomId;
+                connectToRoom(savedRoomId);
+            }
         };
 
-        function initPeer(callback) {
-            peer = new Peer({ host: 'peerjs.com', secure: true, port: 443 });
-            peer.on('open', (id) => {
-                myId = id;
-                document.getElementById('room-status').innerText = "🛑 未进入房间";
-                if(callback) callback();
-            });
-            peer.on('connection', (connection) => {
-                isHost = true;
-                handleHostConnection(connection);
-            });
-        }
+        function closePayOverlay() { document.getElementById('pay-overlay').style.display = 'none'; }
 
-        // 房东意外刷新后，恢复房间
-        function recreateHostRoom(targetRoomId) {
-            myName = localStorage.getItem('gandengyan_name');
-            isHost = true;
-            gameState.roomId = targetRoomId;
+        function connectToRoom(roomId) {
+            gameState.roomId = roomId;
+            channel = new BroadcastChannel('gandengyan_room_' + roomId);
             
-            // 尝试读取本地断线前存下的最后分数状态，防止房东刷新数据归零
-            const savedState = localStorage.getItem('gandengyan_last_state');
-            if(savedState) {
-                gameState = JSON.parse(savedState);
-            } else {
-                gameState.players[myId] = { name: myName, totalScore: 0, currentLoss: 0 };
-            }
+            channel.onmessage = function(ev) {
+                const data = ev.data;
+                if (data.type === 'ASK_SYNC') {
+                    sendMsg({ type: 'SYNC', state: gameState });
+                }
+                if (data.type === 'SYNC') {
+                    if(Object.keys(data.state.players).length >= Object.keys(gameState.players).length) {
+                        gameState = data.state;
+                        updateUI();
+                    }
+                }
+            };
 
-            peer.destroy();
-            peer = new Peer(targetRoomId, { host: 'peerjs.com', secure: true, port: 443 });
-            peer.on('open', (id) => {
-                document.getElementById('room-status').innerHTML = `🏠 房间号: <span class="text-amber-400 text-xl font-black">${id}</span>`;
-                showGameView();
+            setTimeout(() => {
+                sendMsg({ type: 'ASK_SYNC' });
+                if (!gameState.players[myId]) {
+                    gameState.players[myId] = { name: myName, totalScore: 0, currentLoss: 0 };
+                }
+                sendMsg({ type: 'SYNC', state: gameState });
                 updateUI();
-            });
-            peer.on('connection', (connection) => { handleHostConnection(connection); });
+            }, 500);
+
+            document.getElementById('room-status').innerHTML = `🏠 房间号: <span class="text-amber-400 font-black">${roomId}</span>`;
+            showGameView();
         }
+
+        function sendMsg(msg) { if(channel) channel.postMessage(msg); }
 
         function createRoom() {
             myName = document.getElementById('username-input').value.trim();
-            if(!myName) return alert("请先输入您的名字！");
+            if(!myName) return alert("请输入名字！");
             localStorage.setItem('gandengyan_name', myName);
-
-            let shortRoomId = Math.floor(1000 + Math.random() * 9000).toString();
-            localStorage.setItem('gandengyan_room_id', shortRoomId);
-            localStorage.setItem('gandengyan_is_host', 'true');
-            
-            recreateHostRoom(shortRoomId);
+            let roomId = Math.floor(1000 + Math.random() * 9000).toString();
+            localStorage.setItem('gandengyan_room_id', roomId);
+            gameState.players[myId] = { name: myName, totalScore: 0, currentLoss: 0 };
+            connectToRoom(roomId);
         }
 
         function joinRoom() {
             myName = document.getElementById('username-input').value.trim();
-            let targetRoom = document.getElementById('room-input').value.trim();
-            if(!myName || !targetRoom) return;
-
+            let roomId = document.getElementById('room-input').value.trim();
+            if(!myName || !roomId) return alert("请填写名字和房间号！");
             localStorage.setItem('gandengyan_name', myName);
-            localStorage.setItem('gandengyan_room_id', targetRoom);
-            localStorage.setItem('gandengyan_is_host', 'false');
-
-            document.getElementById('room-status').innerText = "正在重新连接房间...";
-            
-            conn = peer.connect(targetRoom);
-            conn.on('open', () => {
-                document.getElementById('room-status').innerHTML = `🤝 已进房间: <span class="text-amber-400 font-bold">${targetRoom}</span>`;
-                conn.send({ type: 'JOIN', name: myName, id: myId });
-                showGameView();
-            });
-
-            conn.on('data', (data) => {
-                if (data.type === 'SYNC') {
-                    gameState = data.state;
-                    updateUI();
-                }
-            });
+            localStorage.setItem('gandengyan_room_id', roomId);
+            connectToRoom(roomId);
         }
 
-        function handleHostConnection(connection) {
-            connections.push(connection);
-            // 房东上线，立刻把最新的全局数据塞给刚连进来的客人
-            if(connection.open) connection.send({ type: 'SYNC', state: gameState });
-
-            connection.on('data', (data) => {
-                if (data.type === 'JOIN') {
-                    // 如果换了手机或刷新了，防止生成重复的人，按名字或ID覆盖
-                    if(!gameState.players[data.id]) {
-                        gameState.players[data.id] = { name: data.name, totalScore: 0, currentLoss: 0 };
-                    }
-                    broadcastState();
-                }
-                if (data.type === 'UPDATE_LOSS') {
-                    if(gameState.players[data.id]) {
-                        gameState.players[data.id].currentLoss = data.loss;
-                        broadcastState();
-                    }
-                }
-                if (data.type === 'WIN_SETTLE') {
-                    settleRound(data.winnerId);
-                }
-            });
-        }
-
-        function broadcastState() {
-            updateUI();
-            localStorage.setItem('gandengyan_last_state', JSON.stringify(gameState)); // 房东随时备份
-            connections.forEach(c => {
-                if(c.open) c.send({ type: 'SYNC', state: gameState });
-            });
-        }
-
-        // 常规增加输分
         function addLoss(points) {
-            let current = gameState.players[myId]?.currentLoss || 0;
-            sendLossUpdate(current + points);
+            if(!gameState.players[myId]) return;
+            gameState.players[myId].currentLoss += points;
+            sendMsg({ type: 'SYNC', state: gameState }); updateUI();
         }
 
-        // 自定义数字输分（新增加的功能）
         function addCustomLoss() {
             let inputEl = document.getElementById('custom-loss-input');
             let points = parseInt(inputEl.value);
-            if (isNaN(points) || points <= 0) return alert("请输入正确的数字");
-            
-            let current = gameState.players[myId]?.currentLoss || 0;
-            sendLossUpdate(current + points);
-            inputEl.value = ''; // 清空输入框
-        }
-
-        function sendLossUpdate(newLoss) {
-            if (isHost) {
-                gameState.players[myId].currentLoss = newLoss;
-                broadcastState();
-            } else if (conn && conn.open) {
-                conn.send({ type: 'UPDATE_LOSS', id: myId, loss: newLoss });
-            }
+            if (isNaN(points) || points <= 0) return alert("请输入正确数字");
+            if(!gameState.players[myId]) return;
+            gameState.players[myId].currentLoss += points;
+            inputEl.value = ''; sendMsg({ type: 'SYNC', state: gameState }); updateUI();
         }
 
         function clearMyLoss() {
-            sendLossUpdate(0);
+            if(!gameState.players[myId]) return;
+            gameState.players[myId].currentLoss = 0;
+            sendMsg({ type: 'SYNC', state: gameState }); updateUI();
         }
 
         function confirmWin() {
-            if (confirm("确认你是本局赢家吗？")) {
-                if (isHost) {
-                    settleRound(myId);
-                } else if (conn && conn.open) {
-                    conn.send({ type: 'WIN_SETTLE', winnerId: myId });
-                }
+            if (confirm("确认收回全场点数？")) {
+                let pool = 0;
+                Object.keys(gameState.players).forEach(id => {
+                    if (id !== myId) {
+                        let loss = gameState.players[id].currentLoss || 0;
+                        pool += loss; gameState.players[id].totalScore -= loss; gameState.players[id].currentLoss = 0;
+                    }
+                });
+                gameState.players[myId].totalScore += pool; gameState.players[myId].currentLoss = 0; gameState.round += 1;
+                sendMsg({ type: 'SYNC', state: gameState }); updateUI();
             }
-        }
-
-        function settleRound(winnerId) {
-            let pool = 0;
-            Object.keys(gameState.players).forEach(id => {
-                if (id !== winnerId) {
-                    let loss = gameState.players[id].currentLoss || 0;
-                    pool += loss;
-                    gameState.players[id].totalScore -= loss;
-                    gameState.players[id].currentLoss = 0; 
-                }
-            });
-            if(gameState.players[winnerId]) {
-                gameState.players[winnerId].totalScore += pool;
-                gameState.players[winnerId].currentLoss = 0;
-            }
-            gameState.round += 1;
-            if (isHost) broadcastState();
         }
 
         function updateUI() {
             document.getElementById('round-num').innerText = gameState.round;
-            let pool = 0;
-            Object.keys(gameState.players).forEach(id => { pool += (gameState.players[id].currentLoss || 0); });
+            let pool = 0; Object.keys(gameState.players).forEach(id => { pool += (gameState.players[id].currentLoss || 0); });
             document.getElementById('total-pool').innerText = pool;
-
-            if(gameState.players[myId]) {
-                document.getElementById('my-current-loss').innerText = gameState.players[myId].currentLoss;
-            }
-
-            const container = document.getElementById('players-container');
-            container.innerHTML = '';
-
+            if(gameState.players[myId]) { document.getElementById('my-current-loss').innerText = gameState.players[myId].currentLoss; }
+            const container = document.getElementById('players-container'); container.innerHTML = '';
             let sortedPlayers = Object.keys(gameState.players).map(id => ({
                 id: id, ...gameState.players[id]
             })).sort((a, b) => b.totalScore - a.totalScore);
 
             sortedPlayers.forEach((player, index) => {
                 const isMe = player.id === myId;
-                const scoreColor = player.totalScore >= 0 ? 'text-emerald-400' : 'text-red-400';
-                const rankMedal = index === 0 ? '👑' : `第${index + 1}名`;
-
+                const scoreColor = player.totalScore >= 0 ? 'text-emerald-400' : 'text-red-500';
+                const rankMedal = index === 0 ? '👑' : `Rank ${index + 1}`;
                 const playerCard = document.createElement('div');
-                playerCard.className = `p-3 rounded-xl flex justify-between items-center ${isMe ? 'bg-slate-700 border-2 border-amber-400' : 'bg-slate-800'}`;
-                playerCard.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs bg-slate-600 text-slate-300 px-1.5 py-0.5 rounded font-bold">${rankMedal}</span>
-                        <span class="text-xl font-black ${isMe ? 'text-amber-300' : 'text-white'}">${player.name} ${isMe ? '(我)' : ''}</span>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-2xl font-black ${scoreColor}">${player.totalScore > 0 ? '+' : ''}${player.totalScore}</div>
-                        <div class="text-xs text-slate-400 font-bold">本局已投: <span class="text-red-400">${player.currentLoss}</span></div>
-                    </div>
-                `;
+                playerCard.className = `p-3 rounded-xl flex justify-between items-center ${isMe ? 'bg-slate-800 border border-amber-400/50' : 'bg-slate-900 border border-slate-800'}`;
+                playerCard.innerHTML = `<div class="flex items-center gap-2"><span class="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-bold">${rankMedal}</span><span class="text-xl font-black ${isMe ? 'text-amber-300' : 'text-white'}">${player.name}</span></div><div class="text-right"><div class="text-2xl font-black ${scoreColor}">${player.totalScore > 0 ? '+' : ''}${player.totalScore}</div><div class="text-xs text-slate-500 font-bold">本局投: <span class="text-red-500">${player.currentLoss}</span></div></div>`;
                 container.appendChild(playerCard);
             });
         }
-
-        function showGameView() {
-            document.getElementById('login-view').classList.add('hidden');
-            document.getElementById('game-view').classList.remove('hidden');
-            document.getElementById('game-view').classList.add('flex');
-        }
-
-        // 遇到卡死、卡顿一键强行重连
-        function emergencyRefresh() {
-            window.location.reload();
-        }
+        function showGameView() { document.getElementById('login-view').classList.add('hidden'); document.getElementById('game-view').classList.remove('hidden'); document.getElementById('game-view').classList.add('flex'); }
+        function emergencyRefresh() { window.location.reload(); }
     </script>
 </body>
 </html>
