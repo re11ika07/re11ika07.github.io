@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>干瞪眼大字版实时记分器</title>
+    <!-- 引入大字和美化样式 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入免费的P2P联机库 -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        body { -webkit-touch-callout: none; -webkit-user-select: none; }
+        .huge-btn { font-size: 1.75rem; padding: 1rem; text-align: center; border-radius: 0.75rem; font-weight: bold; transition: all 0.1s; }
+        .huge-btn:active { transform: scale(0.95); filter: brightness(0.9); }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col p-4 font-sans selection:bg-transparent">
+
+    <!-- 顶部状态与房间信息 -->
+    <header class="bg-slate-800 p-4 rounded-xl shadow-lg mb-4 text-center">
+        <h1 class="text-2xl font-black tracking-wider text-amber-400 mb-1">🎴 干瞪眼记分器 (大字防呆版)</h1>
+        <div id="room-status" class="text-sm text-slate-400 font-bold">正在初始化联机模块...</div>
+    </header>
+
+    <!-- 登录与开房间界面 -->
+    <section id="login-view" class="bg-slate-800 p-6 rounded-xl shadow-lg space-y-6 my-auto">
+        <div>
+            <label class="block text-xl font-bold mb-2 text-slate-300">1. 你的名字：</label>
+            <input type="text" id="username-input" class="w-full text-2xl p-3 bg-slate-700 rounded-lg text-white font-bold border-2 border-slate-600 focus:border-amber-400 outline-none" placeholder="输入长辈名字">
+        </div>
+        <div class="border-t border-slate-700 pt-4">
+            <label class="block text-xl font-bold mb-2 text-slate-300">2. 房间操作：</label>
+            <button onclick="createRoom()" class="w-full bg-emerald-600 text-white text-2xl font-bold py-4 rounded-xl shadow-md hover:bg-emerald-500 active:scale-95 transition mb-3">
+                ➕ 我要开新房间
+            </button>
+            <div class="flex gap-2">
+                <input type="text" id="room-input" class="w-2/3 text-xl p-3 bg-slate-700 rounded-lg text-white font-bold border-2 border-slate-600" placeholder="输入别人的房间号">
+                <button onclick="joinRoom()" class="w-1/3 bg-amber-500 text-slate-900 text-xl font-bold rounded-xl active:scale-95 transition">
+                    加入
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 游戏主界面 -->
+    <section id="game-view" class="hidden flex-col flex-1 space-y-4">
+        
+        <!-- 本局奖池和防呆提醒 -->
+        <div class="bg-amber-500 text-slate-950 p-4 rounded-xl shadow-inner text-center">
+            <div class="text-lg font-bold opacity-80">🔥 第 <span id="round-num" class="font-black">1</span> 局 · 本局总奖池</div>
+            <div id="total-pool" class="text-5xl font-black my-1">0</div>
+            <div class="text-xs font-bold bg-amber-600/30 py-1 rounded">所有人输完点数后，赢家点【一键收回】</div>
+        </div>
+
+        <!-- 玩家列表与个人卡片 -->
+        <div id="players-container" class="space-y-3 max-h-[35vh] overflow-y-auto pr-1">
+            <!-- 动态渲染玩家卡片 -->
+        </div>
+
+        <!-- 我的操作面板（大按钮区） -->
+        <div id="my-panel" class="bg-slate-800 p-4 rounded-xl shadow-lg border-t-4 border-amber-400 mt-auto">
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-lg font-bold text-slate-300">我这一局输了：<span id="my-current-loss" class="text-2xl text-red-400 font-black">0</span> 点</span>
+                <button onclick="clearMyLoss()" class="text-sm bg-slate-700 text-slate-300 px-3 py-1 rounded-lg font-bold">重置本局</button>
+            </div>
+            
+            <!-- 1-8大按键区 -->
+            <div class="grid grid-cols-4 gap-3 mb-4">
+                <button onclick="addLoss(1)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+1</button>
+                <button onclick="addLoss(2)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+2</button>
+                <button onclick="addLoss(3)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+3</button>
+                <button onclick="addLoss(4)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+4</button>
+                <button onclick="addLoss(5)" class="huge-btn bg-red-900/40 text-red-200 border-b-4 border-red-950">+5</button>
+                <button onclick="addLoss(6)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+6</button>
+                <button onclick="addLoss(7)" class="huge-btn bg-slate-700 text-white border-b-4 border-slate-800">+7</button>
+                <button onclick="addLoss(8)" class="huge-btn bg-red-600 text-white border-b-4 border-red-800">+8</button>
+            </div>
+
+            <!-- 赢家收回按钮 -->
+            <button onclick="confirmWin()" class="w-full bg-emerald-600 text-white text-2xl font-black py-4 rounded-xl shadow-lg border-b-4 border-emerald-800 active:scale-95 transition">
+                👑 我赢了！一键收回全场
+            </button>
+        </div>
+    </section>
+
+    <!-- 核心逻辑脚本 -->
+    <script>
+        let peer = null;
+        let conn = null; // 如果是客端，保存与主端的连接
+        let connections = []; // 如果是主端，保存所有客端连接
+        let isHost = false;
+
+        // 游戏核心数据状态
+        let gameState = {
+            roomId: '',
+            round: 1,
+            players: {} // { id: { name: '', totalScore: 0, currentLoss: 0 } }
+        };
+        let myId = '';
+        let myName = '';
+
+        // 页面加载自动尝试恢复上一次的房间
+        window.onload = function() {
+            const savedState = localStorage.getItem('gandengyan_state');
+            const savedName = localStorage.getItem('gandengyan_name');
+            if (savedName) document.getElementById('username-input').value = savedName;
+            
+            // 初始化无服务器P2P模块
+            initPeer();
+        };
+
+        function initPeer() {
+            // 使用免费的公共 PeerJS 服务器进行握手
+            peer = new Peer({
+                host: '0.peerjs.com',
+                secure: true,
+                port: 443
+            });
+
+            peer.on('open', (id) => {
+                myId = id;
+                document.getElementById('room-status').innerText = "🛑 未进入房间 (网络就绪)";
+            });
+
+            peer.on('connection', (connection) => {
+                // 主端收到客端的加入请求
+                isHost = true;
+                handleHostConnection(connection);
+            });
+        }
+
+        // 创建房间（作为主端）
+        function createRoom() {
+            myName = document.getElementById('username-input').value.trim();
+            if(!myName) return alert("请先输入您的名字！");
+            localStorage.setItem('gandengyan_name', myName);
+
+            // 用当前时间戳后4位作为简短房间号，方便长辈输入
+            let shortRoomId = Math.floor(1000 + Math.random() * 9000).toString();
+            gameState.roomId = shortRoomId;
+            
+            // 将自己加入玩家列表
+            gameState.players[myId] = { name: myName, totalScore: 0, currentLoss: 0 };
+            
+            // 重新创建一个以房间号为ID的Peer，以便别人能搜到
+            peer.destroy();
+            
+            peer = new Peer(shortRoomId, { host: '0.peerjs.com', secure: true, port: 443 });
+            
+            peer.on('open', (id) => {
+                document.getElementById('room-status').innerHTML = `🏠 房间号: <span class="text-amber-400 text-xl font-black">${id}</span> (告诉牌友输这个号)`;
+                showGameView();
+                updateUI();
+            });
+
+            peer.on('connection', (connection) => {
+                handleHostConnection(connection);
+            });
+        }
+
+        // 加入房间（作为客端）
+        function joinRoom() {
+            myName = document.getElementById('username-input').value.trim();
+            let targetRoom = document.getElementById('room-input').value.trim();
+            if(!myName || !targetRoom) return alert("请输入名字和房间号！");
+            localStorage.setItem('gandengyan_name', myName);
+
+            document.getElementById('room-status').innerText = "正在拼命连接房间...";
+            
+            conn = peer.connect(targetRoom);
+            
+            conn.on('open', () => {
+                document.getElementById('room-status').innerHTML = `🤝 已成功加入房间: <span class="text-amber-400 font-bold">${targetRoom}</span>`;
+                // 告诉主端我的名字
+                conn.send({ type: 'JOIN', name: myName, id: myId });
+                showGameView();
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'SYNC') {
+                    gameState = data.state;
+                    updateUI();
+                }
+            });
+        }
+
+        // 主端处理客端连接逻辑
+        function handleHostConnection(connection) {
+            connections.push(connection);
+            connection.on('data', (data) => {
+                if (data.type === 'JOIN') {
+                    gameState.players[data.id] = { name: data.name, totalScore: 0, currentLoss: 0 };
+                    broadcastState();
+                }
+                if (data.type === 'UPDATE_LOSS') {
+                    if(gameState.players[data.id]) {
+                        gameState.players[data.id].currentLoss = data.loss;
+                        broadcastState();
+                    }
+                }
+                if (data.type === 'WIN_SETTLE') {
+                    settleRound(data.winnerId);
+                }
+            });
+            
+            connection.on('close', () => {
+                connections = connections.filter(c => c !== connection);
+            });
+        }
+
+        // 广播最新数据给所有人
+        function broadcastState() {
+            updateUI();
+            connections.forEach(c => {
+                if(c.open) c.send({ type: 'SYNC', state: gameState });
+            });
+        }
+
+        // 输家加点数
+        function addLoss(points) {
+            let current = gameState.players[myId]?.currentLoss || 0;
+            let newLoss = current + points;
+            
+            // 限制单枪最高8点
+            if (newLoss > 64) return; 
+
+            if (isHost) {
+                gameState.players[myId].currentLoss = newLoss;
+                broadcastState();
+            } else if (conn && conn.open) {
+                conn.send({ type: 'UPDATE_LOSS', id: myId, loss: newLoss });
+            }
+        }
+
+        function clearMyLoss() {
+            if (isHost) {
+                gameState.players[myId].currentLoss = 0;
+                broadcastState();
+            } else if (conn && conn.open) {
+                conn.send({ type: 'UPDATE_LOSS', id: myId, loss: 0 });
+            }
+        }
+
+        // 赢家点击收回全场
+        function confirmWin() {
+            if (confirm("确认你是本局赢家，并收回全场所有点数吗？")) {
+                if (isHost) {
+                    settleRound(myId);
+                } else if (conn && conn.open) {
+                    conn.send({ type: 'WIN_SETTLE', winnerId: myId });
+                }
+            }
+        }
+
+        // 一局结算核心防呆逻辑
+        function settleRound(winnerId) {
+            let pool = 0;
+            // 1. 搜集所有输家的点数，并从总分里扣除
+            Object.keys(gameState.players).forEach(id => {
+                if (id !== winnerId) {
+                    let loss = gameState.players[id].currentLoss || 0;
+                    pool += loss;
+                    gameState.players[id].totalScore -= loss;
+                    gameState.players[id].currentLoss = 0; // 清空输家本局点数
+                }
+            });
+
+            // 2. 将奖池全部加给赢家
+            if(gameState.players[winnerId]) {
+                gameState.players[winnerId].totalScore += pool;
+                gameState.players[winnerId].currentLoss = 0;
+            }
+
+            // 3. 局数加1
+            gameState.round += 1;
+            
+            // 4. 同步所有人
+            if (isHost) {
+                broadcastState();
+            }
+        }
+
+        // 刷新更新界面
+        function updateUI() {
+            document.getElementById('round-num').innerText = gameState.round;
+            
+            // 计算当前总奖池
+            let pool = 0;
+            Object.keys(gameState.players).forEach(id => {
+                pool += (gameState.players[id].currentLoss || 0);
+            });
+            document.getElementById('total-pool').innerText = pool;
+
+            // 更新我的本局输分显示
+            if(gameState.players[myId]) {
+                document.getElementById('my-current-loss').innerText = gameState.players[myId].currentLoss;
+            }
+
+            // 渲染排行榜和积分
+            const container = document.getElementById('players-container');
+            container.innerHTML = '';
+
+            // 将玩家转为数组并按【总积分】从高到低排序
+            let sortedPlayers = Object.keys(gameState.players).map(id => ({
+                id: id,
+                ...gameState.players[id]
+            })).sort((a, b) => b.totalScore - a.totalScore);
+
+            sortedPlayers.forEach((player, index) => {
+                const isMe = player.id === myId;
+                const scoreColor = player.totalScore >= 0 ? 'text-emerald-400' : 'text-red-400';
+                const rankMedal = index === 0 ? '👑' : `第${index + 1}名`;
+
+                const playerCard = document.createElement('div');
+                playerCard.className = `p-3 rounded-xl flex justify-between items-center ${isMe ? 'bg-slate-700 border-2 border-amber-400' : 'bg-slate-800'}`;
+                playerCard.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs bg-slate-600 text-slate-300 px-1.5 py-0.5 rounded font-bold">${rankMedal}</span>
+                        <span class="text-xl font-black ${isMe ? 'text-amber-300' : 'text-white'}">${player.name} ${isMe ? '(我)' : ''}</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-black ${scoreColor}">${player.totalScore > 0 ? '+' : ''}${player.totalScore}</div>
+                        <div class="text-xs text-slate-400 font-bold">本局已投: <span class="text-red-400">${player.currentLoss}</span></div>
+                    </div>
+                `;
+                container.appendChild(playerCard);
+            });
+        }
+
+        function showGameView() {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('game-view').classList.remove('hidden');
+            document.getElementById('game-view').classList.add('flex');
+        }
+    </script>
+</body>
+</html>
