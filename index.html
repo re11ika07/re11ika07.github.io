@@ -74,7 +74,7 @@
             <div class="text-xs font-medium text-slate-500">输家录入点数 ➡️ 赢家一键收网</div>
         </div>
 
-        <div id="players-container" class="space-y-2 max-h-[30vh] overflow-y-auto pr-1"></div>
+        <div id="players-container" class="space-y-2 max-h-[35vh] overflow-y-auto pr-1"></div>
 
         <div id="my-panel" class="bg-slate-900 p-4 rounded-2xl border-t border-slate-800 mt-auto space-y-3">
             <div class="flex justify-between items-center px-1">
@@ -135,7 +135,7 @@
                     sendMsg({ type: 'SYNC', state: gameState });
                 }
                 if (data.type === 'SYNC') {
-                    if(Object.keys(data.state.players).length >= Object.keys(gameState.players).length) {
+                    if(data.state && Object.keys(data.state.players).length >= Object.keys(gameState.players).length) {
                         gameState = data.state;
                         updateUI();
                     }
@@ -201,12 +201,17 @@
             if (confirm("确认收回全场点数？")) {
                 let pool = 0;
                 Object.keys(gameState.players).forEach(id => {
+                    let loss = gameState.players[id].currentLoss || 0;
                     if (id !== myId) {
-                        let loss = gameState.players[id].currentLoss || 0;
-                        pool += loss; gameState.players[id].totalScore -= loss; gameState.players[id].currentLoss = 0;
+                        pool += loss; 
+                        gameState.players[id].totalScore -= loss;
+                        gameState.players[id].currentLoss = 0;
                     }
                 });
-                gameState.players[myId].totalScore += pool; gameState.players[myId].currentLoss = 0; gameState.round += 1;
+                gameState.players[myId].totalScore += pool; 
+                gameState.players[myId].currentLoss = 0; 
+                gameState.round += 1;
+                
                 sendMsg({ type: 'SYNC', state: gameState }); updateUI();
             }
         }
@@ -217,17 +222,44 @@
             document.getElementById('total-pool').innerText = pool;
             if(gameState.players[myId]) { document.getElementById('my-current-loss').innerText = gameState.players[myId].currentLoss; }
             const container = document.getElementById('players-container'); container.innerHTML = '';
+            
             let sortedPlayers = Object.keys(gameState.players).map(id => ({
                 id: id, ...gameState.players[id]
             })).sort((a, b) => b.totalScore - a.totalScore);
 
             sortedPlayers.forEach((player, index) => {
                 const isMe = player.id === myId;
-                const scoreColor = player.totalScore >= 0 ? 'text-emerald-400' : 'text-red-500';
-                const rankMedal = index === 0 ? '👑' : `Rank ${index + 1}`;
+                
+                // 核心改动：把原本冰冷的 + / - 数字，转换成大白话汉字
+                let statusText = '';
+                let statusColor = '';
+                if (player.totalScore > 0) {
+                    statusText = `🟢 净赢 ${player.totalScore} 点`;
+                    statusColor = 'text-emerald-400';
+                } else if (player.totalScore < 0) {
+                    statusText = `🔴 净输 ${Math.abs(player.totalScore)} 点`;
+                    statusColor = 'text-red-500';
+                } else {
+                    statusText = `⚪ 平局不输不赢`;
+                    statusColor = 'text-slate-400';
+                }
+
+                const rankMedal = index === 0 ? '👑 暂列第一' : `第 ${index + 1} 名`;
+
                 const playerCard = document.createElement('div');
                 playerCard.className = `p-3 rounded-xl flex justify-between items-center ${isMe ? 'bg-slate-800 border border-amber-400/50' : 'bg-slate-900 border border-slate-800'}`;
-                playerCard.innerHTML = `<div class="flex items-center gap-2"><span class="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-bold">${rankMedal}</span><span class="text-xl font-black ${isMe ? 'text-amber-300' : 'text-white'}">${player.name}</span></div><div class="text-right"><div class="text-2xl font-black ${scoreColor}">${player.totalScore > 0 ? '+' : ''}${player.totalScore}</div><div class="text-xs text-slate-500 font-bold">本局投: <span class="text-red-500">${player.currentLoss}</span></div></div>`;
+                playerCard.innerHTML = `
+                    <div class="flex flex-col gap-0.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-bold">${rankMedal}</span>
+                            <span class="text-xl font-black ${isMe ? 'text-amber-300' : 'text-white'}">${player.name} ${isMe ? '(我)' : ''}</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xl font-black ${statusColor}">${statusText}</div>
+                        <div class="text-xs text-slate-500 font-bold">本局已丢: <span class="text-red-500">${player.currentLoss}</span></div>
+                    </div>
+                `;
                 container.appendChild(playerCard);
             });
         }
