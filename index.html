@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>微筹码精简版 - 干瞪眼</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/roomservice-browser@0.1.2/dist/roomservice.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         body { -webkit-touch-callout: none; -webkit-user-select: none; }
         .chip-btn { font-size: 1.85rem; padding: 0.95rem 0; text-align: center; border-radius: 0.85rem; font-weight: 900; transition: all 0.1s; }
@@ -18,10 +18,8 @@
         <div class="bg-slate-900 p-6 rounded-2xl shadow-2xl max-w-sm w-full border-2 border-amber-400 space-y-5">
             <h2 class="text-2xl font-black text-amber-400">⚡ 纯净无广告激活 ⚡</h2>
             <p class="text-base font-bold text-slate-300 leading-relaxed">
-                本程序完美复刻微筹码功能，并<span class="text-emerald-400">永久移除弹窗广告</span>。<br>
-                每次开局，请长按下方二维码<br><span class="text-amber-400 text-xl font-black">自觉转账 1 元辛苦费</span>。
+                本程序完美复刻微筹码功能，并<span class="text-emerald-400">永久移除弹窗广告</span>。<br>每次开局，请长按下方二维码<br><span class="text-amber-400 text-xl font-black">自觉转账 1 元辛苦费</span>。
             </p>
-            
             <div class="bg-white p-3 rounded-xl mx-auto w-44 h-44 flex flex-col items-center justify-center shadow-inner relative overflow-hidden">
                 <div class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-slate-100 text-slate-800 text-sm font-bold">
                     <span>🖼️ 收款二维码</span>
@@ -29,23 +27,41 @@
                 </div>
                 <img src="https://pic1.imgdb.cn/item/6a09955242582d261d233f8a.jpg" alt="微信扫码转账" class="max-w-full max-h-full z-10 relative">
             </div>
-            
-            <p class="text-xs text-slate-500 font-bold">相互信任，打牌更顺畅！多谢老板厚爱~</p>
-            
             <button onclick="closePayOverlay()" class="w-full bg-amber-500 text-slate-950 text-xl font-black py-4 rounded-xl shadow-lg active:scale-95 transition">
                 🚀 免广告进入计分器
             </button>
         </div>
     </div>
 
+    <div id="settlement-overlay" class="fixed inset-0 bg-slate-950/95 z-50 hidden flex-col items-center justify-center p-6 text-center">
+        <div class="bg-slate-900 p-6 rounded-2xl shadow-2xl max-w-sm w-full border-2 border-emerald-400 space-y-5">
+            <h2 class="text-3xl font-black text-emerald-400">🏁 游戏结束</h2>
+            <p class="text-slate-400 font-bold">系统已为您生成最优结账方案：</p>
+            
+            <div id="bill-container" class="bg-slate-800 p-4 rounded-xl space-y-3 text-left max-h-[40vh] overflow-y-auto">
+                </div>
+
+            <div class="space-y-3 pt-3">
+                <button onclick="resetGame()" class="w-full bg-emerald-600 text-white text-lg font-black py-3 rounded-xl shadow-lg active:scale-95 transition">
+                    ✅ 账目结清，开启新一轮
+                </button>
+                <button onclick="closeSettlement()" class="w-full bg-slate-700 text-slate-300 text-lg font-black py-3 rounded-xl active:scale-95 transition">
+                    返回查看分数
+                </button>
+            </div>
+        </div>
+    </div>
+
     <header class="bg-slate-900 p-3 flex justify-between items-center border-b border-slate-800">
         <div>
-            <h1 class="text-xl font-black tracking-wider text-amber-400">⚡ 微筹码纯净版</h1>
-            <div id="room-status" class="text-xs text-emerald-400 font-bold mt-0.5">🟢 联机通道就绪</div>
+            <h1 class="text-xl font-black tracking-wider text-amber-400">⚡ 微筹码</h1>
+            <div id="room-status" class="text-xs text-slate-500 font-bold mt-0.5">正在连接服务器...</div>
         </div>
-        <button onclick="emergencyRefresh()" class="bg-slate-800 text-slate-400 px-3 py-1.5 rounded-lg font-bold text-xs border border-slate-700 active:scale-95">
-            🔄 强制刷新
-        </button>
+        <div class="flex gap-2">
+            <button onclick="leaveRoom()" class="bg-slate-800 text-red-400 px-3 py-1.5 rounded-lg font-bold text-xs border border-slate-700 active:scale-95">
+                🚪 退出房间
+            </button>
+        </div>
     </header>
 
     <section id="login-view" class="bg-slate-900 p-4 rounded-xl space-y-6 my-auto">
@@ -59,7 +75,7 @@
                 创建新房间 (我是房主)
             </button>
             <div class="flex gap-2">
-                <input type="text" id="room-input" class="w-2/3 text-xl p-3 bg-slate-800 rounded-xl text-white font-black border-2 border-slate-700 text-center" placeholder="输入4位房间号">
+                <input type="number" id="room-input" class="w-2/3 text-xl p-3 bg-slate-800 rounded-xl text-white font-black border-2 border-slate-700 text-center" placeholder="输入4位房间号">
                 <button onclick="joinRoom()" class="w-1/3 bg-amber-500 text-slate-950 text-xl font-black rounded-xl active:scale-95 transition">
                     加入房间
                 </button>
@@ -68,13 +84,13 @@
     </section>
 
     <section id="game-view" class="hidden flex-col flex-1 space-y-4 pt-2">
-        <div class="bg-gradient-to-b from-slate-800 to-slate-900 p-4 rounded-2xl shadow-2xl text-center border border-slate-700">
+        <div class="bg-gradient-to-b from-slate-800 to-slate-900 p-4 rounded-2xl shadow-2xl text-center border border-slate-700 relative">
             <div class="text-sm font-bold text-slate-400 tracking-widest">ROUND <span id="round-num" class="text-amber-400 font-black">1</span> · 本局总奖池</div>
             <div id="total-pool" class="text-6xl font-black my-2 tracking-tight text-amber-400">0</div>
             <div class="text-xs font-medium text-slate-500">输家录入点数 ➡️ 赢家一键收网</div>
         </div>
 
-        <div id="players-container" class="space-y-2 max-h-[35vh] overflow-y-auto pr-1"></div>
+        <div id="players-container" class="space-y-2 max-h-[30vh] overflow-y-auto pr-1"></div>
 
         <div id="my-panel" class="bg-slate-900 p-4 rounded-2xl border-t border-slate-800 mt-auto space-y-3">
             <div class="flex justify-between items-center px-1">
@@ -83,188 +99,12 @@
             </div>
             
             <div class="flex items-center gap-2 bg-slate-800 p-2 rounded-xl border border-slate-700">
-                <input type="number" id="custom-loss-input" class="w-full text-xl p-1 bg-slate-900 rounded-lg text-center font-black text-amber-400 outline-none" placeholder="其他大点数输入这里">
+                <input type="number" id="custom-loss-input" class="w-full text-xl p-1 bg-slate-900 rounded-lg text-center font-black text-amber-400 outline-none" placeholder="其他大点数输入">
                 <button onclick="addCustomLoss()" class="bg-amber-500 text-slate-950 px-5 py-2 rounded-xl font-black text-sm active:scale-95 whitespace-nowrap">确定</button>
             </div>
 
             <div class="grid grid-cols-4 gap-2.5">
                 <button onclick="addLoss(1)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+1</button>
                 <button onclick="addLoss(2)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+2</button>
-                <button onclick="addLoss(3)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+3</button>
-                <button onclick="addLoss(4)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+4</button>
-                <button onclick="addLoss(5)" class="chip-btn bg-orange-950/40 text-orange-400 border-b-4 border-orange-950">+5</button>
-                <button onclick="addLoss(6)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+6</button>
-                <button onclick="addLoss(7)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-900">+7</button>
-                <button onclick="addLoss(8)" class="chip-btn bg-red-600 text-white border-b-4 border-red-800">+8</button>
-            </div>
-
-            <button onclick="confirmWin()" class="w-full bg-emerald-600 text-white text-2xl font-black py-4 rounded-xl shadow-xl border-b-4 border-emerald-800 active:scale-95 transition">
-                👑 我赢了！一键收回全池
-            </button>
-        </div>
-    </section>
-
-    <script>
-        let channel = null;
-        let myId = 'p_' + Math.random().toString(36).substr(2, 9);
-        let myName = '';
-        let gameState = { roomId: '', round: 1, players: {} };
-
-        window.onload = function() {
-            const savedName = localStorage.getItem('gandengyan_name');
-            if (savedName) document.getElementById('username-input').value = savedName;
-            
-            document.getElementById('room-status').innerText = "🟢 联机通道就绪";
-
-            const savedRoomId = localStorage.getItem('gandengyan_room_id');
-            if (savedRoomId && savedName) {
-                document.getElementById('room-input').value = savedRoomId;
-                connectToRoom(savedRoomId);
-            }
-        };
-
-        function closePayOverlay() { document.getElementById('pay-overlay').style.display = 'none'; }
-
-        function connectToRoom(roomId) {
-            gameState.roomId = roomId;
-            channel = new BroadcastChannel('gandengyan_room_' + roomId);
-            
-            channel.onmessage = function(ev) {
-                const data = ev.data;
-                if (data.type === 'ASK_SYNC') {
-                    sendMsg({ type: 'SYNC', state: gameState });
-                }
-                if (data.type === 'SYNC') {
-                    if(data.state && Object.keys(data.state.players).length >= Object.keys(gameState.players).length) {
-                        gameState = data.state;
-                        updateUI();
-                    }
-                }
-            };
-
-            setTimeout(() => {
-                sendMsg({ type: 'ASK_SYNC' });
-                if (!gameState.players[myId]) {
-                    gameState.players[myId] = { name: myName, totalScore: 0, currentLoss: 0 };
-                }
-                sendMsg({ type: 'SYNC', state: gameState });
-                updateUI();
-            }, 500);
-
-            document.getElementById('room-status').innerHTML = `🏠 房间号: <span class="text-amber-400 font-black">${roomId}</span>`;
-            showGameView();
-        }
-
-        function sendMsg(msg) { if(channel) channel.postMessage(msg); }
-
-        function createRoom() {
-            myName = document.getElementById('username-input').value.trim();
-            if(!myName) return alert("请输入名字！");
-            localStorage.setItem('gandengyan_name', myName);
-            let roomId = Math.floor(1000 + Math.random() * 9000).toString();
-            localStorage.setItem('gandengyan_room_id', roomId);
-            gameState.players[myId] = { name: myName, totalScore: 0, currentLoss: 0 };
-            connectToRoom(roomId);
-        }
-
-        function joinRoom() {
-            myName = document.getElementById('username-input').value.trim();
-            let roomId = document.getElementById('room-input').value.trim();
-            if(!myName || !roomId) return alert("请填写名字和房间号！");
-            localStorage.setItem('gandengyan_name', myName);
-            localStorage.setItem('gandengyan_room_id', roomId);
-            connectToRoom(roomId);
-        }
-
-        function addLoss(points) {
-            if(!gameState.players[myId]) return;
-            gameState.players[myId].currentLoss += points;
-            sendMsg({ type: 'SYNC', state: gameState }); updateUI();
-        }
-
-        function addCustomLoss() {
-            let inputEl = document.getElementById('custom-loss-input');
-            let points = parseInt(inputEl.value);
-            if (isNaN(points) || points <= 0) return alert("请输入正确数字");
-            if(!gameState.players[myId]) return;
-            gameState.players[myId].currentLoss += points;
-            inputEl.value = ''; sendMsg({ type: 'SYNC', state: gameState }); updateUI();
-        }
-
-        function clearMyLoss() {
-            if(!gameState.players[myId]) return;
-            gameState.players[myId].currentLoss = 0;
-            sendMsg({ type: 'SYNC', state: gameState }); updateUI();
-        }
-
-        function confirmWin() {
-            if (confirm("确认收回全场点数？")) {
-                let pool = 0;
-                Object.keys(gameState.players).forEach(id => {
-                    let loss = gameState.players[id].currentLoss || 0;
-                    if (id !== myId) {
-                        pool += loss; 
-                        gameState.players[id].totalScore -= loss;
-                        gameState.players[id].currentLoss = 0;
-                    }
-                });
-                gameState.players[myId].totalScore += pool; 
-                gameState.players[myId].currentLoss = 0; 
-                gameState.round += 1;
-                
-                sendMsg({ type: 'SYNC', state: gameState }); updateUI();
-            }
-        }
-
-        function updateUI() {
-            document.getElementById('round-num').innerText = gameState.round;
-            let pool = 0; Object.keys(gameState.players).forEach(id => { pool += (gameState.players[id].currentLoss || 0); });
-            document.getElementById('total-pool').innerText = pool;
-            if(gameState.players[myId]) { document.getElementById('my-current-loss').innerText = gameState.players[myId].currentLoss; }
-            const container = document.getElementById('players-container'); container.innerHTML = '';
-            
-            let sortedPlayers = Object.keys(gameState.players).map(id => ({
-                id: id, ...gameState.players[id]
-            })).sort((a, b) => b.totalScore - a.totalScore);
-
-            sortedPlayers.forEach((player, index) => {
-                const isMe = player.id === myId;
-                
-                // 核心改动：把原本冰冷的 + / - 数字，转换成大白话汉字
-                let statusText = '';
-                let statusColor = '';
-                if (player.totalScore > 0) {
-                    statusText = `🟢 净赢 ${player.totalScore} 点`;
-                    statusColor = 'text-emerald-400';
-                } else if (player.totalScore < 0) {
-                    statusText = `🔴 净输 ${Math.abs(player.totalScore)} 点`;
-                    statusColor = 'text-red-500';
-                } else {
-                    statusText = `⚪ 平局不输不赢`;
-                    statusColor = 'text-slate-400';
-                }
-
-                const rankMedal = index === 0 ? '👑 暂列第一' : `第 ${index + 1} 名`;
-
-                const playerCard = document.createElement('div');
-                playerCard.className = `p-3 rounded-xl flex justify-between items-center ${isMe ? 'bg-slate-800 border border-amber-400/50' : 'bg-slate-900 border border-slate-800'}`;
-                playerCard.innerHTML = `
-                    <div class="flex flex-col gap-0.5">
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-bold">${rankMedal}</span>
-                            <span class="text-xl font-black ${isMe ? 'text-amber-300' : 'text-white'}">${player.name} ${isMe ? '(我)' : ''}</span>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-xl font-black ${statusColor}">${statusText}</div>
-                        <div class="text-xs text-slate-500 font-bold">本局已丢: <span class="text-red-500">${player.currentLoss}</span></div>
-                    </div>
-                `;
-                container.appendChild(playerCard);
-            });
-        }
-        function showGameView() { document.getElementById('login-view').classList.add('hidden'); document.getElementById('game-view').classList.remove('hidden'); document.getElementById('game-view').classList.add('flex'); }
-        function emergencyRefresh() { window.location.reload(); }
-    </script>
-</body>
-</html>
+                <button onclick="addLoss(3)" class="chip-btn bg-slate-800 text-slate-200 border-b-4 border-slate-
+                    
